@@ -1,0 +1,20 @@
+[project]
+name = "nearsurf"
+version = "0.1.0"
+description = "2D 合成地震数据的近地表：陆上近地表（7 种场景）、海水层与海底，以及陆上 / 海底 / 拖缆背景噪声与道缺陷（numpy + scipy）"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+]
+
+[project.optional-dependencies]
+plot = ["matplotlib>=3.7"]      # land.plot 画近地表剖面
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["nearsurf"]
