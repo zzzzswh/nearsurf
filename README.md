@@ -16,7 +16,7 @@ solver, bit-for-bit reproducible from a seed.
 ## 安装
 
 ```bash
-pip install git+https://github.com/<你的账号>/nearsurf.git        # 或 uv add git+https://github.com/<你的账号>/nearsurf.git
+pip install git+https://github.com/zzzzswh/nearsurf.git        # 或 uv add git+https://github.com/zzzzswh/nearsurf.git
 pip install -e .                                                  # 本地开发（可编辑安装）；画图另装 .[plot]
 ```
 
@@ -88,7 +88,7 @@ python tests/test_nearsurf.py
 ## 开发
 
 ```bash
-git clone https://github.com/<你的账号>/nearsurf.git && cd nearsurf
+git clone https://github.com/zzzzswh/nearsurf.git && cd nearsurf
 pip install -e .            # 或 uv pip install -e .
 python tests/test_nearsurf.py
 ```
