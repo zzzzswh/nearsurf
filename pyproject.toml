@@ -10,8 +10,8 @@ dependencies = [
 ]
 
 # 推到 GitHub 后把下面的地址填上（去掉注释）
-# [project.urls]
-# Homepage = "https://github.com/<你的账号>/nearsurf"
+[project.urls]
+Homepage = "https://github.com/zzzzswh/nearsurf"
 
 [project.optional-dependencies]
 plot = ["matplotlib>=3.7"]      # land.plot 画近地表剖面
