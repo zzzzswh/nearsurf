@@ -1,20 +1,24 @@
 # nearsurf
 
+Near-surface models for 2D synthetic seismic data: seven onshore scenarios (rugged topography, weathering layer,
+water table, Vp/Vs, heterogeneity), offshore water layer and seafloor, plus matching background noise
+(land / ocean-bottom / towed streamer, with trace defects). Pure numpy / scipy, independent of any wave-equation
+solver, bit-for-bit reproducible from a seed.
+
 2D 合成地震数据的**近地表**：陆上近地表（7 种场景）、海水层与海底，以及配套的背景噪声。纯 numpy / scipy，和正演程序无关。
 
 - 给一个深部速度模型 → 加上起伏地表、风化层、潜水面、非均质（陆上 7 种场景），或海水层 + 海底地形 + 沉积物（海上），同时给出地表 / 潜水面 / 风化层底 / 海底的真值
 - 给一个干净道集 → 加上陆上 / 海底节点背景噪声（9 类分量 + 6 类道缺陷）或海上拖缆噪声（4 类）
 - 同一种子逐比特可复现
 
-原本是 [PreStack-data-factory](../../README.md) 的一部分（`prestack_factory.nearsurface / marine / noise` 现在都转发到这里），拆出来给别的项目、别的正演程序用。
+原本是 PreStack-data-factory（2D 叠前合成数据工厂）的一部分，拆出来给别的项目、别的正演程序用。
 
 ## 安装
 
 ```bash
-pip install ./packages/nearsurf            # 或 uv add ./packages/nearsurf；画图另装 nearsurf[plot]
+pip install git+https://github.com/<你的账号>/nearsurf.git        # 或 uv add git+https://github.com/<你的账号>/nearsurf.git
+pip install -e .                                                  # 本地开发（可编辑安装）；画图另装 .[plot]
 ```
-
-在 PreStack-data-factory 里不用单独装：它是 uv 工作区成员，`uv sync` 时一起装好。
 
 ## 快速上手
 
@@ -81,8 +85,12 @@ noisy = nearsurf.streamer_noise(shot, dt=0.002, dx_rec=12.5, seed=0)
 python tests/test_nearsurf.py
 ```
 
-## 独立成仓库
+## 开发
 
 ```bash
-git subtree split --prefix packages/nearsurf -b nearsurf     # 带着历史拆出一个分支，推到新仓库即可
+git clone https://github.com/<你的账号>/nearsurf.git && cd nearsurf
+pip install -e .            # 或 uv pip install -e .
+python tests/test_nearsurf.py
 ```
+
+每次推送，GitHub Actions 会在 Python 3.10–3.13 上跑一遍测试（`.github/workflows/test.yml`）。
