@@ -9,7 +9,6 @@ dependencies = [
     "scipy>=1.10",
 ]
 
-# 推到 GitHub 后把下面的地址填上（去掉注释）
 [project.urls]
 Homepage = "https://github.com/zzzzswh/nearsurf"
 
