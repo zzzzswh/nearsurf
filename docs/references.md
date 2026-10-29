@@ -1,100 +1,184 @@
-# 近地表建模的依据（prestack_factory/nearsurface.py）
+# Physical basis and references
 
-本文档说明近地表模块里每一步建模选择的来源，以及参数区间是怎么定的。
+This document explains where each modelling choice in `nearsurf` comes from and how the parameter ranges were set.
+[中文版](references.zh-CN.md)
 
-> **2026-10 修订说明。**逐条核对了参考文献：补全了卷期、页码、DOI 和作者；更正了 Pelletier et al. 2015 的题目；补上了正文引用、但文献表里漏掉的 Newman & Turcotte 1990、Castagna et al. 1985 和 Bachrach et al. 1998。
-> 每一步都标了依据的类型，分三种：
-> - **【文献】**：有文献直接支撑；
-> - **【文献·外推】**：文献只支持定性规律，或者被外推到了文献没有覆盖的尺度；
-> - **【经验取值】**：没有文献依据，是工程上的设定。
->
-> 没有出处的说法单独列在第 6 节。
+Every step is tagged with the kind of support it has:
 
-## 1. 地形形态
+- **[literature]**: directly supported by the cited work;
+- **[literature, extrapolated]**: the literature supports the qualitative behaviour, or the result is applied
+  outside the scale the literature covers;
+- **[engineering choice]**: no literature support; a setting chosen to make models plausible and numerically usable.
 
-**谱特征【文献】。**地形剖面的功率谱在很宽的尺度范围内近似服从 S(k) ∝ k^-2，对应分形布朗运动的 Hurst 指数 H ≈ 0.5（β = 2H + 1）（Turcotte 1992；Newman & Turcotte 1990）。纯分形谱缺少河网和沟谷，不能完整描述真实地形；在坡面尺度上，坡面输运过程会在谱上留下特征尺度，使地形偏离分形（Perron et al. 2008）。
+Statements that are used in the text but still lack a source are listed in [Open points](#8-open-points).
 
-**实现。**用 fBm 谱合成剖面，Hurst 取 0.4～0.75。参数 `lmin` 去掉短于坡面尺度的分量，再做坡面扩散，产生特征尺度。早期版本 Hurst 取 0.6～0.95，谱比实测偏陡（地形过于平滑），已经修正。Hurst 和 `lmin` 的具体区间按场景设定，属于【经验取值】。
+## 1. Topography (`nearsurf/land.py`)
 
-**坡面扩散【文献】。**土壤覆盖坡面的输运通量随坡度非线性增加，接近临界坡度时迅速变大：q = K·S / (1 − (S/Sc)²)。这使山顶呈凸形、坡面趋于平直（Roering et al. 1999；2001）。`hillslope_diffusion` 采用的就是这一形式，`diffusion` 参数是扩散长度尺度（取值为【经验取值】）。
+**Spectrum [literature].** Topographic profiles have a power spectrum close to S(k) ∝ k⁻² over a wide range of
+scales, i.e. fractional Brownian motion with Hurst exponent H ≈ 0.5 (β = 2H + 1) (Turcotte, 1992; Newman &
+Turcotte, 1990). A purely fractal spectrum has no valleys or channel networks; at hillslope scales, transport
+processes imprint a characteristic length and the topography departs from fractal behaviour (Perron et al., 2008).
 
-**黄土塬【经验取值，待补文献】。**塬是黄土堆积后被流水侵蚀残留的高原面，地表平坦（坡度 1°～3°），四周为深切沟谷；黄土厚度一般 50～200 m，局部超过 300 m。这几个数字目前没有出处，见第 6 节。`topo_loess` 采用"平缓塬面 + 陡壁平底冲沟"的形态，黄土厚度取 50～150 m，沟底黄土被剥蚀后较薄。
+*Implementation.* Profiles are synthesised from an fBm spectrum with H = 0.4–0.75. The parameter `lmin` removes
+wavelengths shorter than the hillslope scale and hillslope diffusion then creates the characteristic scale.
+The per-scenario ranges of H and `lmin` are [engineering choice].
 
-**沙丘【文献】。**横向沙丘迎风坡约 5°～10°，背风滑落面接近休止角。Sutton et al.（2013a, 2013b）的实验给出平均临界角约 34°、平均休止角约 32°（转引自 Pelletier et al. 2015；Sutton 原文未核对）。Pelletier et al.（2015）的野外观测还表明，临界角和休止角都会随风速增大而减小，临界角也随滑落面高度略有下降。`topo_dunes` 直接由丘高和两侧坡角决定丘长，不单独抽取波长，保证坡角落在实测范围内。小沙丘（几米高）的滑落面只有几个网格宽，经过扩散后坡角会低于休止角。
+**Hillslope diffusion [literature].** Soil flux on soil-mantled slopes grows non-linearly with slope and diverges
+near a critical slope, q = K·S / (1 − (S/S_c)²), which produces convex hilltops and planar side slopes
+(Roering et al., 1999, 2001). `hillslope_diffusion` uses this form; the diffusion length `diffusion` is an
+[engineering choice].
 
-## 2. 风化层厚度
+**Loess plateau [engineering choice].** A plateau is the remnant of loess deposition dissected by fluvial erosion:
+a nearly flat top bounded by deeply incised gullies. `topo_loess` uses "gentle plateau + steep-walled, flat-floored
+gullies" with 50–150 m of loess, thinner on gully floors where it has been eroded. The geomorphic numbers behind
+this are listed under [Open points](#8-open-points).
 
-**浅部（土壤 / 可移动风化物）【文献·外推】。**厚度与坡面曲率呈强线性关系（凹处厚、凸处薄），斜率随流域曲率标准差变化，截距等于平直坡处的厚度（Patton et al. 2018）。实现上把曲率按标准差归一化，取 `th_base + th_curv · cn`。
+**Dunes [literature].** Transverse dunes have stoss slopes of about 5–10° and lee (slip) faces near the angle of
+repose. Experiments by Sutton et al. (2013a, b) give a mean critical angle of about 34° and a mean angle of repose of
+about 32° (as reported by Pelletier et al., 2015; the Sutton papers were not checked). Field observations by
+Pelletier et al. (2015) show that both angles decrease with wind speed and that the critical angle decreases slightly
+with slip-face height. `topo_dunes` sets the dune length from the dune height and the two slope angles, so the slopes
+stay within the observed range. Small dunes (a few metres high) have slip faces only a few grid cells wide and end up
+below the angle of repose after diffusion.
 
-注意：Patton et al. 2018 研究的是米级的可移动风化物（拟合 RMSE 约 0.19 m），而地震意义上的低降速带往往有几十米。这里把同样的"凹厚凸薄"规律外推到更厚的风化层，是一个合理但没有直接验证的假设。`th_base`、`th_curv`、`th_slope` 的区间是【经验取值】。
+## 2. Weathering thickness
 
-**深部（裂隙化基岩底界）【文献·外推】。**地震折射和电阻率成像表明，裂隙发育带的底界有两种形态：水平构造挤压应力相对近地表重力应力较大时，底界"镜像"地形（山脊下更深）；比值较小时，底界平行于地表（St. Clair et al. 2015）。参数 `mirror` 控制这一点：平原取 0～0.1，丘陵取 0～0.3，山前带（挤压构造背景）取 0.1～0.5。
+**Shallow part (soil / mobile regolith) [literature, extrapolated].** Thickness is strongly and linearly related to
+hillslope curvature (thick in hollows, thin on noses); the slope of the relation scales with the standard deviation
+of curvature in the catchment and the intercept equals the thickness on planar slopes (Patton et al., 2018).
+`nearsurf` normalises curvature by its standard deviation and uses `th_base + th_curv · cn`.
 
-注意：St. Clair et al. 2015 只给出"镜像 / 平行"的定性判据，`mirror` 系数本身是【经验取值】。另外，实现里这一项是 `mirror × (平滑高程 − 均值)`，单位是米，随起伏幅度线性放大。`configs/synth2d_long.yaml` 把起伏放大到几百米后，这一项可达 ±100 m 量级，远大于 `th_base`，厚度大面积被裁到 `th_lo` / `th_hi`。如果不希望这样，应改为按起伏幅度归一化。
+Patton et al. (2018) studied metre-scale mobile regolith (fit RMSE about 0.19 m), whereas seismic low-velocity
+layers are often tens of metres thick. Applying the same "thick in hollows, thin on noses" rule to the thicker
+weathering layer is a reasonable but unverified assumption. The ranges of `th_base`, `th_curv` and `th_slope` are
+[engineering choice].
 
-## 3. 潜水面
+**Deep part (base of fractured bedrock) [literature, extrapolated].** Seismic refraction and resistivity imaging
+show two shapes of the base of the fractured zone: it mirrors the topography (deeper under ridges) when horizontal
+tectonic compression is large relative to near-surface gravitational stress, and parallels the surface when the ratio
+is small (St. Clair et al., 2015). The parameter `mirror` controls this: 0–0.1 for plains, 0–0.3 for hills and
+0.1–0.5 for foothills (compressional setting).
 
-**【文献·外推】**非承压含水层的潜水面常被当作"地形的平缓版"，但这一假设并不总成立：潜水面是否跟随地形取决于补给、渗透系数和地形尺度，可以用一个简单判据预先估计（Haitjema & Mitchell-Bruker 2005）。原文还提到另有数值研究表明，潜水面浅时主要受地形控制、近似平行于地表，变深时地形的控制减弱；这句目前没有出处，见第 6 节。
+St. Clair et al. (2015) give only the qualitative mirror / parallel criterion; the value of `mirror` is an
+[engineering choice]. In the implementation the term is `mirror × (smoothed elevation − mean)` in metres, so it
+grows linearly with relief: with relief scaled to several hundred metres it reaches ±100 m, far more than `th_base`,
+and thickness is often clipped at `th_lo` / `th_hi`. Normalising it by the relief would avoid this.
 
-实现上，参数 `wt_follow` 按场景递减：平原 0.4～0.8，丘陵 0.3～0.7，山前带 0.2～0.5，黄土塬 0～0.2，沙漠 0～0.1。文献给的是判据，没有给这个系数，所以具体数值是【经验取值】。
+## 3. Water table
 
-## 4. 速度
+**[literature, extrapolated].** The water table of an unconfined aquifer is often assumed to be a subdued copy of the
+topography, but whether it follows the topography depends on recharge, hydraulic conductivity and the scale of the
+terrain, and can be estimated with a simple criterion (Haitjema & Mitchell-Bruker, 2005).
 
-**干燥松散层的梯度【文献】。**颗粒介质的 Hertz-Mindlin 接触理论预测速度与有效应力的 1/6 次方成正比。在浅部，有效应力近似与深度成正比，所以 v ∝ z^(1/6)。海滩干砂实测的浅层 P 波速度可低至 150 m/s 左右，并且随深度按幂律增加（Bachrach et al. 1998；2000）。实现上取 `v = v0 (1 + d/d0)^n`，n 为 0.15～0.30。干砂表层真实速度远低于 `v_floor`（默认 450 m/s），这是为控制网格做的妥协（见第 5 节）。
+`wt_follow` decreases by scenario: plain 0.4–0.8, hills 0.3–0.7, foothills 0.2–0.5, loess 0–0.2, desert 0–0.1.
+The literature gives a criterion, not this coefficient, so the values are an [engineering choice].
 
-**饱和跳变【文献】。**饱和松散砂的 P 波速度一般为 1500～2000 m/s。微测井统计：
+## 4. Velocities
 
-- 尼日尔三角洲 OML-62，61 个点（Akpabio & Onwusiri 2004）：风化层（降速层）210～994 m/s（平均 552），次风化层（高速层）1358～2464 m/s（平均 1734），风化层厚 2.8～52.8 m（平均 19.3）；
-- 另一组统计：降速层 482～1147 m/s，高速层 1601～1832 m/s，厚 3～20.5 m。**这组数据没有出处**，见第 6 节。
+**Gradient in dry unconsolidated material [literature].** Hertz–Mindlin contact theory for granular media predicts
+velocity proportional to effective stress to the power 1/6; near the surface, effective stress is roughly
+proportional to depth, so v ∝ z^(1/6). Shallow P-wave velocities in dry beach sand can be as low as about 150 m/s and
+increase with depth following a power law (Bachrach et al., 1998, 2000). `nearsurf` uses `v = v0 (1 + d/d0)^n` with
+n = 0.15–0.30. Real dry-sand velocities near the surface are far below the default `v_floor` (450 m/s); that floor is
+a numerical compromise (Section 7).
 
-`v_sat` 取 1500～2200 m/s，`v0` 取 450～1200 m/s，与这些统计一致。
+**Jump at the water table [literature].** Saturated unconsolidated sand typically has Vp of 1500–2000 m/s.
+Uphole statistics from 61 points in OML 62, Niger Delta (Akpabio & Onwusiri, 2004): weathering layer 210–994 m/s
+(mean 552), sub-weathering layer 1358–2464 m/s (mean 1734), weathering thickness 2.8–52.8 m (mean 19.3).
+`v_sat` = 1500–2200 m/s and `v0` = 450–1200 m/s are consistent with these values.
 
-**横波速度。**
-- 深部 Vs【文献】：用 Castagna 泥岩线 Vs = (Vp − 1360)/1.16（Castagna et al. 1985）。原关系是对饱水碎屑岩拟合的，用到所有深部地层上是一个近似。
-- 干燥层 Vp/Vs 取 1.5～2.0【文献·外推】：依据是干燥松散介质的泊松比低。Bachrach et al. 2000 专门研究了浅层松散砂的泊松比，可以作为依据，但具体数值还没有和原文对照过。
-- 潜水面以下 Vs 不跳变：依据是 Gassmann 理论中流体不改变剪切模量。文献待补，见第 6 节。
+**Shear-wave velocity.**
+- Deep Vs [literature]: the mudrock line Vs = (Vp − 1360)/1.16 (Castagna et al., 1985). It was fitted to
+  water-saturated clastic rocks; applying it to all deep formations is an approximation.
+- Dry-layer Vp/Vs = 1.5–2.0 [literature, extrapolated]: dry unconsolidated media have low Poisson's ratios;
+  Bachrach et al. (2000) studied Poisson's ratio of shallow unconsolidated sands, but the exact values have not been
+  compared with that paper.
+- No jump in Vs at the water table: fluids do not change the shear modulus in Gassmann's theory (source to be added,
+  see Open points).
 
-**沙漠区的分层【待补文献】。**沙丘区的折射静校正通常把近地表分为三层：干燥风化层、潜水面以下层、高速层。
+**Fast crust (caliche) [literature, qualitative + engineering choice].** A thin, fast near-surface layer causes a
+velocity inversion and "shingled" first arrivals that conventional diving-wave tomography cannot handle. It is added
+with probability `p_caliche`; its depth, thickness, velocity and coverage are [engineering choice]. A 1.5–5 m thick
+crust shows up only as isolated cells on a coarse (e.g. 6.25 m) grid.
 
-**高速夹层【文献·定性 + 经验取值】。**近地表薄高速层（如钙质硬壳）会造成速度反转，使初至呈"叠瓦"状；常规回折波层析不能正确处理速度反转。这是静校正中的经典难题，实现上以概率 `p_caliche` 加入。原文的出处只写了"见相关专利与技术文献"，没有具体文献，见第 6 节。硬壳的深度、厚度、速度、覆盖率都是【经验取值】。另外，硬壳厚 1.5～5 m，在大偏移距档的网格（6.25 m）上只表现为零星的单个格点。
+**Loess attenuation [literature].** Strong attenuation in thick Quaternary loess weakens deep reflections, and loess
+landforms (plateaus, ridges, hills, gullies) make the topography complex; modelling in loess areas generally needs
+both irregular topography and attenuation Q (Hu et al., 2023). `nearsurf` does not provide Q (Section 7).
 
-**黄土的衰减【文献】。**厚层第四系黄土的强衰减会削弱深层反射；黄土塬区地貌多样（塬、梁、峁、沟），地形起伏复杂。黄土塬区正演一般需要同时考虑起伏地表和衰减 Q（Hu et al. 2023）。
+**Transitions, heterogeneity and the rest [engineering choice].** These are set to make the models look plausible
+and to control numerical error:
 
-**过渡、非均质与其他【经验取值】。**下面这些都没有文献依据，是为了让模型看起来合理、并控制数值误差而设定的：
+- the smoothstep transition at the weathering base (width `trans`);
+- the fractured top of the deep model, lowered by `frac` and recovering exponentially over about 20 m
+  (St. Clair et al. (2015) support only the existence of a fractured low-velocity zone);
+- the anisotropic random field: strength `het`, vertical correlation 3 m, horizontal 30–150 m, decaying as e^(−d/60);
+- low-velocity channel fill: position, size and velocity reduction;
+- the constraint `v_sat ≥ 1.3·v0`.
 
-- 风化层底的 smoothstep 过渡（带宽 `trans`）；
-- 裂隙化基岩顶面"先降 `frac`、再在约 20 m 内指数恢复"的形式。St. Clair et al. 2015 只支持"存在裂隙发育的低速带"这一定性结论；
-- 2D 非均质随机场：强度 `het`、垂直相关 3 m、水平相关 30～150 m、按 e^(−d/60) 随深度衰减；
-- 古河道低速透镜体：位置、尺寸、降速比例；
-- `v_sat ≥ 1.3·v0` 的约束。
+## 5. Offshore (`nearsurf/marine.py`)
 
-## 5. 数值上的妥协与目前没有模拟的
+**Sediment Vp/Vs [literature, adapted].** Hamilton (1979) linked Vp and Vs measurements in marine sediments: in
+soft terrigenous sediments Vp/Vs falls from about 13 or more at the seafloor to about 2.6 at 1000 m, and in sands from
+about 9 at 5 m to about 6 at 20 m. `nearsurf` lets Vp/Vs decay from 4–8 at the seafloor towards about 2.2 at depth,
+and clips Vs at `vs_floor`: the real seafloor Vs (often ~100 m/s) is too slow for typical solver grids. The seafloor
+values are therefore a numerical compromise rather than a reproduction of Hamilton's curves.
 
-- **速度下限 `v_floor` / `vs_floor`**：场景抽到的 v0 低于 `v_floor` 时，整条速度曲线整体抬高。这是为控制网格（频散判据）做的妥协，不是地质依据。在大偏移距档（`v_floor` = 1100 m/s）下有两个副作用：一是潜水面处的饱和跳变明显变弱；二是风化层 Vs 可能高于其下浅部基岩的 Vs（Castagna 换算 + Vp/Vs 上限给出约 700 m/s），形成 Vs 反转。
-- **衰减（Q）**：黄土、干砂的强吸收没有体现，当前使用的 SWEEP 声波 / 弹性波方程都没有加 Q。
-- **面波 / 横波**：声波方程模拟不出面波和横波。`solver.equations` 含 `elastic` 时，弹性波正演可以产生近地表面波和转换波；只跑声波时没有。
-- **三维效应**：2D 线源；侧向散射和三维地形的影响没有体现。
-- **黄土微地貌**：黄土陷穴、垂直节理带来的速度非均质和方位各向异性。
+**Water, seafloor shapes and sediment velocities [engineering choice].** Water sound speed 1475–1500 m/s with a
+0.016 s⁻¹ gradient, density 1025 kg/m³; seafloor Vp 1550–1900 m/s with a 0.6–2.0 s⁻¹ gradient; the water-depth classes
+(weighted towards shallow water, where first-break picking is hardest) and the five seafloor styles follow an earlier
+synthetic-streamer generator by the author.
 
-## 6. 待补出处的说法
+## 6. Background noise (`nearsurf/noise`)
 
-下面这些在正文里出现过，但目前没有文献支撑。需要补出处，或者明确改成"经验取值"：
+**Land / ocean-bottom noise [engineering choice].** The components (coloured ambient noise, power line, spikes,
+bursts, patchy and common-mode low-frequency noise, machinery harmonics, wind gusts, air blast) and the trace
+defects (dead, polarity, gain, clipping, ringing, dropouts) describe noise commonly seen in land data; their levels
+and probabilities were set by visual QC of the generated gathers and are not taken from a published model. The
+`rich_v3` / `obn` presets set the background level from the amplitude of the far-offset first breaks, so the
+signal-to-noise ratio degrades with offset as in field data.
 
-1. 黄土塬地貌数据：坡度 1°～3°，黄土厚一般 50～200 m、局部超过 300 m。
-2. 潜水面："潜水面浅时近似平行于地表、变深时地形控制减弱"的数值研究。
-3. 微测井的"另一组统计"（降速层 482～1147 m/s，高速层 1601～1832 m/s，厚 3～20.5 m）。
-4. 沙漠区折射静校正的"三层划分"。
-5. 钙质硬壳 / 速度反转对回折波层析的影响（原文只写"见相关专利与技术文献"）。
-6. Gassmann 理论（潜水面以下 Vs 不跳变的依据）。
-7. Sutton et al. 2013a, 2013b 的原文（沙丘临界角 / 休止角的一手数据）。
+**Towed-streamer noise [literature].** The four types (swell, seismic interference, strumming, cross-feed) and their
+frequency bands and moveouts follow the taxonomy of Hlebnikov et al. (2021); the physics of swell / flow noise is
+discussed by Elboth et al. (2009). Amplitudes are relative to the peak signal of each shot and are an
+[engineering choice]. `nearsurf/noise/streamer.py` also cites Elboth et al. (2010), Gulunay (2008), Parrish (2005)
+and Teigen et al. (2012) for individual noise types; these were carried over from the original code and have not
+been checked against the papers.
 
-## 参考文献
+## 7. Numerical compromises and what is not modelled
+
+- **Velocity floors `v_floor` / `vs_floor`.** When a scenario draws a `v0` below `v_floor`, the whole velocity curve
+  is shifted up. This is a compromise for the solver's grid (dispersion), not geology. With a high floor
+  (e.g. 1100 m/s) the jump at the water table becomes weak, and the weathering-layer Vs can exceed the Vs of the
+  shallow bedrock below (a Vs inversion).
+- **Attenuation (Q)** is not modelled.
+- **Three-dimensional effects**: models are 2D; out-of-plane scattering and 3D topography are not represented.
+- **Loess micro-relief**: sinkholes and vertical joints (velocity heterogeneity and azimuthal anisotropy) are not modelled.
+
+## 8. Open points
+
+Statements used above that still need a source, or should be relabelled as engineering choices:
+
+1. Loess plateau geomorphology: plateau slopes of 1–3°, loess generally 50–200 m thick and locally more than 300 m.
+2. Water table: numerical studies showing that a shallow water table parallels the surface and that topographic
+   control weakens as it deepens.
+3. A second set of uphole statistics (weathering 482–1147 m/s, sub-weathering 1601–1832 m/s, thickness 3–20.5 m).
+4. The three-layer split (dry weathering, below water table, high-velocity layer) used for refraction statics in dunes.
+5. The effect of caliche / velocity inversions on diving-wave tomography.
+6. Gassmann's theory (why Vs does not jump at the water table).
+7. The original Sutton et al. (2013a, b) papers (critical angle and angle of repose of dunes).
+
+Contributions of sources are welcome.
+
+## References
 
 - Akpabio, I.O., Onwusiri, H.N., 2004. The computation of LVL correction parameters in parts of Western Niger Delta (OML 62). *Global Journal of Geological Sciences* 2(1), 45–50.
 - Bachrach, R., Dvorkin, J., Nur, A., 1998. High-resolution shallow-seismic experiments in sand, Part II: Velocities in shallow unconsolidated sand. *Geophysics* 63(4), 1234–1240.
 - Bachrach, R., Dvorkin, J., Nur, A., 2000. Seismic velocities and Poisson's ratio of shallow unconsolidated sands. *Geophysics* 65, 559–564.
 - Castagna, J.P., Batzle, M.L., Eastwood, R.L., 1985. Relationships between compressional-wave and shear-wave velocities in clastic silicate rocks. *Geophysics* 50(4), 571–581. doi:10.1190/1.1441933
+- Elboth, T., Reif, B.A.P., Andreassen, Ø., 2009. Flow and swell noise in marine seismic data. *Geophysics* 74(2), Q17–Q25. doi:10.1190/1.3078403
 - Haitjema, H.M., Mitchell-Bruker, S., 2005. Are water tables a subdued replica of the topography? *Ground Water* 43(6), 781–786. doi:10.1111/j.1745-6584.2005.00090.x
+- Hamilton, E.L., 1979. Vp/Vs and Poisson's ratios in marine sediments and rocks. *Journal of the Acoustical Society of America* 66(4), 1093–1101.
+- Hlebnikov, V., Elboth, T., Vinje, V., Gelius, L.-J., 2021. Noise types and their attenuation in towed marine seismic: A tutorial. *Geophysics* 86, W1–W19. doi:10.1190/geo2019-0808.1
 - Hu, Z., Yang, J., Han, L., Huang, J., Qin, S., Sun, J., Yu, Y., 2023. Modeling seismic wave propagation in the Loess Plateau using a viscoacoustic wave equation with explicitly expressed quality factor. *Frontiers in Earth Science* 10, 1069166. doi:10.3389/feart.2022.1069166
 - Newman, W.I., Turcotte, D.L., 1990. Cascade model for fluvial geomorphology. *Geophysical Journal International* 100.
 - Patton, N.R., Lohse, K.A., Godsey, S.E., Crosby, B.T., Seyfried, M.S., 2018. Predicting soil thickness on soil mantled hillslopes. *Nature Communications* 9, 3329. doi:10.1038/s41467-018-05743-y

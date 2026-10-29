@@ -16,7 +16,7 @@ nearsurf.marine —— 在 2D 深部模型上加海水层 + 海底地形 + 海�
   沉积物  vp = v_sf + grad·d（d = 海底以下深度），vs = vp / r(d)，
           r 在海底处很大（软泥 Vp/Vs 4~8），随深度指数降到 ~2.2；
           rho 软泥约 1.4~1.8 g/cc，随 vp 增大
-  深部    沉积物在 sed_thick 处 smoothstep 过渡到深部模型（data7 映射后的速度），
+  深部    沉积物在 sed_thick 处 smoothstep 过渡到深部模型（调用方给的深部速度），
           深部被海底"切"开（侵蚀截断），与陆上近地表的做法一致
 
 参数来源

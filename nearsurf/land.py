@@ -4,7 +4,7 @@ nearsurf.land —— 在 2D 速度模型上加起伏地表 + 风化带（陆上�
     from nearsurf import land as ns                   # 或 nearsurf.land_model(vp_deep, dh, "loess", seed=0)
     res = ns.build(vp_deep, dh, "loess", rng)        # vp_deep: (nz, nx) m/s，第 0 行是模型顶
     res.vp            # (nz, nx)，地表以上 = 0（空气）
-    res.surf_idx      # (nx,) int，每列第一个固体格点的行号（SWEEP 的 topography）
+    res.surf_idx      # (nx,) int，每列第一个固体格点的行号（阶梯自由表面正演程序要的 topography）
     res.truth         # 地表 / 潜水面 / 风化层底界 等真值曲线
     ns.plot(path, res, dh)
 
@@ -17,7 +17,7 @@ nearsurf.land —— 在 2D 速度模型上加起伏地表 + 风化带（陆上�
   desert     沙漠      不对称沙丘（缓迎风坡、陡背风坡），极低速干沙，戈壁钙质硬壳
   flat       平坦地表  没有起伏，风化层厚度、潜水面、速度结构照常（作为起伏地表的对照组）
   shield     结晶地盾  起伏 10~60 m，薄冰碛（3~20 m，横向变化大）直接盖在 5.5 km/s 以上的基岩上，
-                       潜水面浅，冰碛/基岩接触突变（硬岩矿区；配合 configs/synth2d_hardrock.yaml）
+                       潜水面浅，冰碛/基岩接触突变（硬岩矿区）
 
 构建步骤
 --------
@@ -296,7 +296,7 @@ def build(vp_deep: np.ndarray, dh: float, scenario: str, rng: np.random.Generato
       潜水面下 Vs 不随饱和跳变（流体不承受剪切，Gassmann），沿干燥层的梯度继续
       风化层底 与深部 Vs 用同一个 smoothstep 过渡；非均质场与 Vp 共用
       最后 vs_floor <= Vs <= Vp/1.42（保证泊松比为正）
-    th_scale 把风化层厚度整体放大（面波强度控制，见 synth2d 的 nearsurface.groundroll）。
+    th_scale 把风化层厚度整体放大（面波强度控制：风化层越厚、面波越强）。
     Vs 相关的随机数全部在 Vp 之后抽，所以同一个种子下 Vp 与只做声波时完全一致。
     """
     nz, nx = vp_deep.shape

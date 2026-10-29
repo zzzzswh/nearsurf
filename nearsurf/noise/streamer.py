@@ -1,9 +1,9 @@
 # 拷自 streamer_shots_generator（refs/noise/streamer_noise.py）：四类噪声生成函数原样保留；
 # 去掉 torch 依赖，把组合入口 make_streamer_noise_gpu 换成文件末尾的 numpy 版 make_streamer_noise。
-"""Streamer-scene noise synthesis — v2 (Hlebnikov 2022 taxonomy).
+"""Streamer-scene noise synthesis — v2 (Hlebnikov 2021 taxonomy).
 
 Four additive noise types for towed marine streamer data, following
-Hlebnikov et al. 2022 Table 1. Replaces the earlier v1 {swell, dc_drift,
+Hlebnikov et al. 2021 Table 1. Replaces the earlier v1 {swell, dc_drift,
 white} design with a more literature-grounded set:
 
     swell        — 2–15 Hz, non-coherent waveforms, cluster-shaped envelope
@@ -26,7 +26,7 @@ The pipeline's per-sample `np.random.Generator` is threaded through, so
 Deviation from v5 §4.2 spec
 ---------------------------
 v5 §4.2 listed {swell 2–10 Hz, DC drift 0–2 Hz} following an older
-taxonomy. v2 switches to Hlebnikov 2022's four dominant types (drops
+taxonomy. v2 switches to Hlebnikov 2021's four dominant types (drops
 DC drift — it is subsumed into swell in this taxonomy; adds SI,
 strumming, cross-feed). The tech-delivery doc and project plan should
 be updated at P3.6.
@@ -36,7 +36,7 @@ References
 [1] Hlebnikov, V., Elboth, T., Vinje, V., & Gelius, L.-J. (2019).
     Onboard de-noise processing for improving towed marine seismic
     acquisition efficiency. SEG Expanded Abstracts, doi:10.1190/segam2019-3212338.1
-[2] Hlebnikov, V., Elboth, T., Vinje, V., & Gelius, L.-J. (2022).
+[2] Hlebnikov, V., Elboth, T., Vinje, V., & Gelius, L.-J. (2021).
     Noise types and their attenuation in towed marine seismic: A tutorial.
     Geophysics, 86(2), W1–W19, doi:10.1190/geo2019-0808.1
 [3] Elboth, T., Reif, B. A. P., & Andreassen, O. (2009). Flow and swell
@@ -362,7 +362,7 @@ DEFAULT_AMP_COEFFS: Dict[str, float] = {
 
 
 # =====================================================================
-# numpy 组合入口（synth2d 用；替代原来的 torch 版 make_streamer_noise_gpu，逻辑相同）
+# numpy 组合入口（替代原来的 torch 版 make_streamer_noise_gpu，逻辑相同）
 # =====================================================================
 def make_streamer_noise(shot_gather, dt, dxrec, *, rng=None, amp_coeffs=None, gain=1.0):
     """(nrec, nt) 干净炮集 -> (nrec, nt) 噪声（不含信号）。

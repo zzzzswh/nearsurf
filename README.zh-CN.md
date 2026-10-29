@@ -50,7 +50,7 @@ pip install "nearsurf[plot] @ git+https://github.com/zzzzswh/nearsurf.git"   # �
 
 构建步骤：分形地形加坡面扩散 → 风化层厚度随地貌变化（凹处厚、陡坡薄）→ 潜水面 → 速度（干燥层幂律梯度、
 潜水面跳变、可选硬壳 / 古河道、过渡到裂隙化深部、随深度衰减的各向异性随机场）。每一步的依据见
-[`nearsurf/land.py`](nearsurf/land.py) 和 [`docs/references.md`](docs/references.md)。
+[`nearsurf/land.py`](nearsurf/land.py) 和 [`docs/references.zh-CN.md`](docs/references.zh-CN.md)。
 
 每个场景的参数都是区间，每次实现按种子各抽一个值。用 `overrides` 改区间，比如
 `overrides={"relief": [100, 100], "het": [0, 0]}`。注意写成 `[a, a]` 区间而不是标量：这样随机数的抽取顺序不变，
@@ -70,7 +70,7 @@ pip install "nearsurf[plot] @ git+https://github.com/zzzzswh/nearsurf.git"   # �
 | 场合 | 函数 | 内容 |
 | --- | --- | --- |
 | 陆上 / 海底节点 | `land_noise` | 有色背景噪声、工频、尖脉冲、爆发、斑块、共模低频、机械谐波、阵风、空气波；道缺陷：死道、极性反转、增益抖动、削波、振铃、掉段 |
-| 海上拖缆 | `streamer_noise` | 涌浪、地震干扰、电缆振动、串音（Hlebnikov et al., 2022） |
+| 海上拖缆 | `streamer_noise` | 涌浪、地震干扰、电缆振动、串音（Hlebnikov et al., 2021） |
 
 预设 `NOISE_PRESETS`：`base`、`rich`、`rich_v3`（按远道初至定背景水平，远道 SNR 10–22 dB）、`obn`（无空气波，更安静）。
 
@@ -79,6 +79,11 @@ pip install "nearsurf[plot] @ git+https://github.com/zzzzswh/nearsurf.git"   # �
 - 模型 `(nz, nx)`，第 0 行是模型顶，深度向下；长度单位 m，速度单位 m/s；地面以上（空气）或海面以上 `vp = 0`。
 - 道集 `(ntr, nt)`；初至标签是样点下标，`nt` 表示无标签。
 - 随机性只来自 `seed`（整数或 `numpy.random.Generator`）：同一种子总是得到同一个结果。
+
+## 依据与参考文献
+
+每一步建模选择的依据、依据的类型（有文献 / 文献外推 / 经验取值）和完整文献表见
+[`docs/references.zh-CN.md`](docs/references.zh-CN.md)。
 
 ## 开发
 

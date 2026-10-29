@@ -115,7 +115,7 @@ The deep model is truncated by the seafloor.
 | Where | Function | Components |
 | --- | --- | --- |
 | land / ocean-bottom nodes | `land_noise` (`noise.land`) | coloured ambient noise, power line, spikes, bursts, patchy and common-mode low-frequency noise, machinery harmonics, wind gusts, air blast; **trace defects**: dead traces, polarity flips, gain jitter, clipping, ringing, telemetry dropouts |
-| towed streamer | `streamer_noise` (`noise.streamer`) | swell, seismic interference, strumming, cross-feed ([Hlebnikov et al., 2022](https://doi.org/10.1190/geo2019-0808.1)) |
+| towed streamer | `streamer_noise` (`noise.streamer`) | swell, seismic interference, strumming, cross-feed ([Hlebnikov et al., 2021](https://doi.org/10.1190/geo2019-0808.1)) |
 
 Presets (`nearsurf.NOISE_PRESETS`): `base`, `rich`, `rich_v3` (background level set from the far-offset
 first breaks, far-offset SNR 10–22 dB) and `obn` (no air blast, quieter). Trace defects remove the first-break
@@ -137,6 +137,11 @@ pip install -e ".[plot]"
 python tests/test_nearsurf.py        # also run by GitHub Actions on Python 3.10–3.13
 python examples/make_figures.py      # regenerates docs/images/
 ```
+
+## References
+
+The physical basis of every modelling step, what kind of support it has (literature, extrapolated from literature,
+or an engineering choice) and the full bibliography are in [`docs/references.md`](docs/references.md).
 
 ## Citing
 

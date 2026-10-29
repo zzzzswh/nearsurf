@@ -29,8 +29,8 @@
               这里作为噪声分量补回）
 
 总水平：master_db —— 样本级总闸，对合成后的总噪声整体加
-一个 U(master_db) dB 的偏移，用于生产期整体水平校准（generate.py 的
-QC 图目检后在 synth/params.py 定先验）；各分量参数只管配比。
+一个 U(master_db) dB 的偏移，用于整体水平校准（对生成的道集
+目检后定先验）；各分量参数只管配比。
 
 道缺陷（corrupt() 统一编排）:
   dead_hard   全零死道（label → no_fb 哨兵）
@@ -70,7 +70,7 @@ class NoiseConfig:
     ref_q: float = 0.95               # 参考水平 = 逐道 RMS/峰值 的该分位数
     trace_var_db: float = 6.0         # 逐道水平等概率随机波动 ±dB
     master_db: tuple = (0.0, 0.0)     # 样本级总闸：总噪声整体偏移 U(lo,hi) dB
-                                      #   （生产先验在 synth/params.py，QC 目检定）
+                                      #   （先验由对生成道集的目检确定）
     # ---- 背景的参照水平 ----
     # "global"：背景 = 参考 RMS（强道分位，基本由近道面波决定）× 10^(−snr_db/20)，再过总闸。
     #           远道弱折射到底被淹到什么程度是间接的、不可控的。
