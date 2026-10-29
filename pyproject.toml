@@ -1,9 +1,19 @@
 [project]
 name = "nearsurf"
 version = "0.1.0"
-description = "2D 合成地震数据的近地表：陆上近地表（7 种场景）、海水层与海底，以及陆上 / 海底 / 拖缆背景噪声与道缺陷（numpy + scipy）"
+description = "Near-surface models (7 onshore scenarios, water layer and seafloor) and background noise for 2D synthetic seismic data"
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "zzzzswh" }]
 requires-python = ">=3.10"
+keywords = ["seismic", "near-surface", "synthetic data", "weathering layer", "topography", "noise", "first-break picking"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Physics",
+]
 dependencies = [
     "numpy>=1.24",
     "scipy>=1.10",
@@ -13,10 +23,10 @@ dependencies = [
 Homepage = "https://github.com/zzzzswh/nearsurf"
 
 [project.optional-dependencies]
-plot = ["matplotlib>=3.7"]      # land.plot 画近地表剖面
+plot = ["matplotlib>=3.7"]      # land.plot and examples/make_figures.py
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]

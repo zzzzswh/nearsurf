@@ -1,96 +1,156 @@
 # nearsurf
 
-Near-surface models for 2D synthetic seismic data: seven onshore scenarios (rugged topography, weathering layer,
-water table, Vp/Vs, heterogeneity), offshore water layer and seafloor, plus matching background noise
-(land / ocean-bottom / towed streamer, with trace defects). Pure numpy / scipy, independent of any wave-equation
-solver, bit-for-bit reproducible from a seed.
+[![test](https://github.com/zzzzswh/nearsurf/actions/workflows/test.yml/badge.svg)](https://github.com/zzzzswh/nearsurf/actions/workflows/test.yml)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)
 
-2D 合成地震数据的**近地表**：陆上近地表（7 种场景）、海水层与海底，以及配套的背景噪声。纯 numpy / scipy，和正演程序无关。
+**Realistic near-surface for 2D synthetic seismic data.** Give it a deep velocity model and it adds rugged
+topography, a weathering layer, a water table and small-scale heterogeneity (seven onshore scenarios), or a
+water layer, seafloor and soft sediments (offshore), together with the ground truth of every interface.
+Give it a clean shot gather and it adds field-like background noise and trace defects.
 
-- 给一个深部速度模型 → 加上起伏地表、风化层、潜水面、非均质（陆上 7 种场景），或海水层 + 海底地形 + 沉积物（海上），同时给出地表 / 潜水面 / 风化层底 / 海底的真值
-- 给一个干净道集 → 加上陆上 / 海底节点背景噪声（9 类分量 + 6 类道缺陷）或海上拖缆噪声（4 类）
-- 同一种子逐比特可复现
+Pure numpy / scipy, independent of any wave-equation solver, and bit-for-bit reproducible from a seed.
 
-原本是 PreStack-data-factory（2D 叠前合成数据工厂）的一部分，拆出来给别的项目、别的正演程序用。
+[中文说明](README.zh-CN.md)
 
-## 安装
+![onshore scenarios](docs/images/scenarios.png)
+
+## Why
+
+Synthetic data is usually too clean exactly where real data is hardest: the near surface. Static corrections,
+first-break picking, ground-roll attenuation and near-surface inversion all depend on a slow weathering layer,
+irregular topography and noise. `nearsurf` turns any deep model (a geological model, Marmousi, a layered earth …)
+into one with a plausible near surface, so the data you simulate on it look and behave like field data, and you
+keep the truth for training or validation.
+
+## Install
 
 ```bash
-pip install git+https://github.com/zzzzswh/nearsurf.git        # 或 uv add git+https://github.com/zzzzswh/nearsurf.git
-pip install -e .                                                  # 本地开发（可编辑安装）；画图另装 .[plot]
+pip install git+https://github.com/zzzzswh/nearsurf.git
+pip install "nearsurf[plot] @ git+https://github.com/zzzzswh/nearsurf.git"   # with matplotlib for plotting
 ```
 
-## 快速上手
+Requires Python ≥ 3.10, numpy and scipy.
+
+## Quick start
 
 ```python
 import numpy as np
 import nearsurf
 
-# 深部模型：(nz, nx)，第 0 行 = 模型顶，深度向下，m/s
-vp_deep = ...; vs_deep = ...; dh = 6.25
+# A deep model: (nz, nx) in m/s, row 0 = top of the model, depth increases downward.
+dh = 5.0
+z = np.arange(200)[:, None] * dh
+vp_deep = np.repeat(2000.0 + 1.2 * z, 600, axis=1).astype(np.float32)
+vs_deep = vp_deep / 1.8
 
-# 陆上近地表
-ns = nearsurf.land_model(vp_deep, dh, "foothills", seed=0, vs_deep=vs_deep, v_floor=1100, vs_floor=700)
-ns.vp, ns.vs                # (nz, nx)，地表以上 = 0（空气）
-ns.surf_z, ns.surf_idx      # 每列真实地表深度（m）/ 第一个固体格点行号（阶梯地表的正演程序用）
-ns.wt_z, ns.base_z          # 潜水面、风化层底界深度（m）—— 真值
-ns.params                   # 这次抽到的全部参数
+# Onshore: add a near surface
+ns = nearsurf.land_model(vp_deep, dh, "foothills", seed=0, vs_deep=vs_deep)
+ns.vp, ns.vs        # (nz, nx); 0 above the surface (air)
+ns.surf_z           # true surface depth per column (m)
+ns.surf_idx         # first solid grid row per column (for staircase free-surface solvers)
+ns.wt_z, ns.base_z  # water table and weathering base (m): ground truth
+ns.params           # every parameter drawn for this realisation
 
-# 海上
-sea = nearsurf.marine_model(vp_deep, vs_deep, dh, seed=0, min_depth=50.0)
-sea.vp, sea.vs, sea.rho, sea.seafloor_z     # 水里 vs = 0、rho = 1025
+# Offshore: water layer + seafloor + sediments
+sea = nearsurf.marine_model(vp_deep, vs_deep, dh, seed=0)
+sea.vp, sea.vs, sea.rho, sea.seafloor_z      # vs = 0 and rho = 1025 in the water
 
-# 背景噪声：道集 (ntr, nt)，初至标签是样点下标（== nt 表示无）
-noisy, label, info = nearsurf.land_noise(gather, dt=0.002, preset="rich_v3", seed=0,
-                                        offsets=offsets, label=fb, defects=True)
-noisy = nearsurf.streamer_noise(shot, dt=0.002, dx_rec=12.5, seed=0)
+# Background noise on a clean gather (ntr, nt); first-break labels are sample indices (nt = no label)
+rng = np.random.default_rng(0)
+gather = rng.standard_normal((96, 1000)).astype(np.float32) * 1e-3
+offsets = (np.arange(96) - 48) * 25.0
+labels = np.full(96, 300)
+noisy, labels_out, info = nearsurf.land_noise(gather, dt=0.002, preset="rich_v3", seed=0,
+                                              offsets=offsets, label=labels, defects=True)
+streamer = nearsurf.streamer_noise(gather, dt=0.002, dx_rec=12.5, seed=0)    # towed-streamer noise
 ```
 
-完整接口：`nearsurf.land.build(...)`、`nearsurf.marine.build(...)`、`nearsurf.noise.land.make_noise / corrupt(...)`、
-`nearsurf.noise.streamer.make_streamer_noise(...)`，参数含义见各模块文件头。
+The full interfaces are `nearsurf.land.build`, `nearsurf.marine.build`, `nearsurf.noise.land.make_noise / corrupt`
+and `nearsurf.noise.streamer.make_streamer_noise`; every parameter is documented in the module headers.
 
-## 陆上场景（`nearsurf.SCENARIOS`）
+## Onshore scenarios
 
-| 场景 | 地貌 | 起伏 | 特点 |
+| Scenario | Setting | Relief | Character |
 | --- | --- | --- | --- |
-| `plain` | 平原 | 5–30 m | 风化层薄，潜水面浅，可能有古河道、钙质硬壳 |
-| `hills` | 丘陵 | 40–150 m | 山顶浑圆，沟谷风化层厚 |
-| `foothills` | 山前带 | 150–350 m | 山脊尖锐，沟谷砾石层厚，潜水面深，非均质强 |
-| `loess` | 黄土塬 | 60–160 m | 平坦塬面 + 深切冲沟，厚层低速黄土 |
-| `desert` | 沙漠 | 沙丘 | 不对称沙丘，极低速干沙，戈壁钙质硬壳 |
-| `flat` | 平地表 | 0 | 风化层、潜水面照常（起伏地表的对照组） |
-| `shield` | 结晶地盾 | 10–60 m | 薄冰碛直接盖在 5.5 km/s 以上的基岩上 |
+| `plain` | alluvial plain | 5–30 m | thin weathering, shallow water table, occasional paleochannels and caliche |
+| `hills` | rolling hills | 40–150 m | rounded hilltops, thick colluvium in the valleys |
+| `foothills` | mountain front | 150–350 m | sharp ridges, gravel-filled valleys, deep water table, strong heterogeneity |
+| `loess` | loess plateau | 60–160 m | flat plateau cut by deep gullies, thick and very slow loess |
+| `desert` | dune field | dunes | asymmetric dunes (gentle stoss, steep lee side), very slow dry sand, desert crust |
+| `flat` | flat surface | 0 | weathering and water table as usual: a control case for topography |
+| `shield` | crystalline shield | 10–60 m | thin glacial till directly on bedrock faster than 5.5 km/s |
 
-每个场景的参数是区间，每次按种子抽一组；`overrides={"relief": [100, 100], "het": [0, 0]}` 改区间
-（写成 `[a, a]` 而不是标量，随机数抽取顺序才不变）。构建步骤和每个参数的依据见 `nearsurf/land.py` 文件头与
-[docs/references.md](docs/references.md)。
+How a model is built (details and references in [`nearsurf/land.py`](nearsurf/land.py) and
+[`docs/references.md`](docs/references.md)):
 
-## 海上（`nearsurf.marine`）
+1. **Topography**: fractional Brownian motion shaped by hillslope diffusion and a slope limit
+   (or plateau + gullies, or dunes), cut into the deep model (erosional truncation).
+2. **Weathering thickness**: thicker in hollows, thinner on steep slopes (soil-production models);
+   loess thickness follows elevation; dunes are their own weathering body.
+3. **Water table**: a smoothed copy of the topography; how closely it follows depends on the scenario.
+4. **Velocities**: a dry layer with a power-law gradient, a jump at the water table, an optional fast crust or
+   slow channel fill, a smooth transition into a fractured top of the deep model, and an anisotropic random field
+   that decays with depth. Vs uses a dry Vp/Vs and does not jump at the water table (fluids carry no shear).
 
-海面是平的自由表面；海水声速剖面；海底五种形态（flat / gentle_slope / rough / canyon / ridge）；
-海底沉积物 Vp 随深度增加、Vp/Vs 从软泥的 4–8 降到约 2.2；深部被海底截断。
+Each scenario defines parameter *ranges*, and every realisation draws one value from each. Narrow or shift them
+with `overrides`, e.g. `overrides={"relief": [100, 100], "het": [0, 0]}`. Give a `[a, a]` range rather than a
+scalar: that keeps the random-number sequence, and therefore everything else in the model, unchanged.
 
-## 背景噪声（`nearsurf.noise`）
+`v_floor` / `vs_floor` clip the slowest velocities. Your solver's grid cannot resolve arbitrarily slow waves,
+so set them from your grid spacing and frequency.
 
-| 场合 | 入口 | 内容 |
+## Offshore
+
+![offshore](docs/images/marine.png)
+
+A flat sea surface, a water sound-speed profile, five seafloor styles (`flat`, `gentle_slope`, `rough`,
+`canyon`, `ridge`) and soft sediments whose Vp/Vs drops from 4–8 at the seafloor towards about 2.2 at depth.
+The deep model is truncated by the seafloor.
+
+## Background noise
+
+![noise](docs/images/noise.png)
+
+| Where | Function | Components |
 | --- | --- | --- |
-| 陆上 / 海底节点 | `land_noise`（`noise.land`） | ambient、工频、尖脉冲、爆发、斑块、共模低频、机械谐波、阵风、空气波；道缺陷：死道、极性反转、增益抖动、削波、振铃、掉段 |
-| 海上拖缆 | `streamer_noise`（`noise.streamer`） | 涌浪、地震干扰、电缆振动、串音（Hlebnikov et al. 2022） |
+| land / ocean-bottom nodes | `land_noise` (`noise.land`) | coloured ambient noise, power line, spikes, bursts, patchy and common-mode low-frequency noise, machinery harmonics, wind gusts, air blast; **trace defects**: dead traces, polarity flips, gain jitter, clipping, ringing, telemetry dropouts |
+| towed streamer | `streamer_noise` (`noise.streamer`) | swell, seismic interference, strumming, cross-feed ([Hlebnikov et al., 2022](https://doi.org/10.1190/geo2019-0808.1)) |
 
-预设 `NOISE_PRESETS`：`base`、`rich`、`rich_v3`（背景按远道初至定水平，远道初至 SNR 10–22 dB）、`obn`（去掉空气波、更安静）。
+Presets (`nearsurf.NOISE_PRESETS`): `base`, `rich`, `rich_v3` (background level set from the far-offset
+first breaks, far-offset SNR 10–22 dB) and `obn` (no air blast, quieter). Trace defects remove the first-break
+labels of the traces they kill.
 
-## 测试
+## Conventions
 
-```bash
-python tests/test_nearsurf.py
-```
+- Models are `(nz, nx)`, row 0 is the top of the model and depth increases downward; lengths in m, velocities in m/s.
+- Above the ground (air) or the sea surface, `vp = 0`.
+- Gathers are `(ntr, nt)`; first-break labels are sample indices and `nt` means "no label".
+- All randomness comes from `seed` (an int or a `numpy.random.Generator`): the same seed always gives the same
+  model or noise, bit for bit.
 
-## 开发
+## Development
 
 ```bash
 git clone https://github.com/zzzzswh/nearsurf.git && cd nearsurf
-pip install -e .            # 或 uv pip install -e .
-python tests/test_nearsurf.py
+pip install -e ".[plot]"
+python tests/test_nearsurf.py        # also run by GitHub Actions on Python 3.10–3.13
+python examples/make_figures.py      # regenerates docs/images/
 ```
 
-每次推送，GitHub Actions 会在 Python 3.10–3.13 上跑一遍测试（`.github/workflows/test.yml`）。
+## Citing
+
+If `nearsurf` helps your work, please cite the repository:
+
+```bibtex
+@software{nearsurf,
+  author = {zzzzswh},
+  title  = {nearsurf: near-surface models and background noise for 2D synthetic seismic data},
+  url    = {https://github.com/zzzzswh/nearsurf},
+  year   = {2026}
+}
+```
+
+## License
+
+[MIT](LICENSE)
